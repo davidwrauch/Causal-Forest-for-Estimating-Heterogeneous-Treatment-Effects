@@ -206,3 +206,31 @@ tree <- rpart(
 
 # Visual representation of segmentation rules
 rpart.plot(tree, cex = 0.7)
+
+# -----------------------------
+# Create quintile summary of treatment effects
+# -----------------------------
+
+quintile_df <- loan_test %>%
+  mutate(bin = ntile(preds, 5)) %>%  # split into 5 equal groups by predicted effect
+  group_by(bin) %>%
+  summarise(avg_effect = mean(preds))
+
+# -----------------------------
+# Plot: how treatment effect varies across groups
+# -----------------------------
+
+quintile_plot <- ggplot(quintile_df, aes(x = factor(bin), y = avg_effect)) +
+  geom_col() +
+  theme_minimal() +
+  labs(
+    x = "Predicted Effect Quintile (1 = lowest, 5 = highest)",
+    y = "Estimated Treatment Effect ($)",
+    title = "Treatment Effects Vary Dramatically Across Households"
+  )
+
+# -----------------------------
+# Save for README
+# -----------------------------
+
+ggsave("quintile_effects.png", quintile_plot, width = 7, height = 5)
