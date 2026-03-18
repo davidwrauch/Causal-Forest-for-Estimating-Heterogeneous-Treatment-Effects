@@ -29,7 +29,7 @@ This is the main result of the project—average effects hide a lot.
 
 ## 🔍 What drives these differences
 
-![Heterogeneous Effects](your_existing_plot.png)
+![Heterogeneous Effects](top 4 variables related to profit increase.png)
 
 These patterns are driven primarily by household composition (size, age, and number of dependents).
 
