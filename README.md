@@ -14,6 +14,20 @@
 
 ---
 
+## 📊 How much effects vary
+
+![Treatment Effect by Quintile](quintile_effects.png)
+
+Households look very different once you estimate individual treatment effects:
+
+- Bottom 20%: ~–$7,200  
+- Top 20%: ~+$8,300  
+
+That’s a ~$15K difference depending on who receives the loan.
+
+This is the main result of the project—average effects hide a lot.
+
+
 ## What this project does
 
 This is a causal ML analysis of a well-known microcredit RCT.
