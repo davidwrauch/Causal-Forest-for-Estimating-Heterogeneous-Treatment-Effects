@@ -27,6 +27,11 @@ That’s a ~$15K difference depending on who receives the loan.
 
 This is the main result of the project—average effects hide a lot.
 
+## 🔍 What drives these differences
+
+![Heterogeneous Effects](your_existing_plot.png)
+
+These patterns are driven primarily by household composition (size, age, and number of dependents).
 
 ## What this project does
 
