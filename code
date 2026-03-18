@@ -1,158 +1,208 @@
-#Let's figure out how to determine which factors are most strongly associated with differences in treatment effects of an experiment in Africa which increases people's access 
-#to microcredit. We will look at change in profit from baseline to post experiment using a causal forest. Causal forests are similar to random forests, a powerful
-#ML algorithm, except they are designed specifically to find splits in variables that emphasize differences in treatment effects. We will find the top predictors
-#without having to look at all 17 factors individually. An output of this analysis will also allow us to use the causal tree trained on this experiment dataset to be 
-#used to find future potential applicants of the program and score them on likelihood of positive impact. Various visualizations including a decision tree are used
-#to illustrate the complex relationship between people's factors and the treatment effect.
+###################### Causal Forest Analysis of Microcredit Impact
 
-library(tree.interpreter)
-library(caret)
-library(dplyr)
-library(mltools)
-library(data.table)
-library(haven)
-library(purrr)
-library(rpart)
-library(rattle)
-library(rpart.plot)
-library(RColorBrewer)
-library(stats)
+# -----------------------------
+# Load and understand the data
+# -----------------------------
 
-#report here https://www.aeaweb.org/articles?id=10.1257/app.20130535
-#full data here https://www.openicpsr.org/openicpsr/project/116333/version/V1/view
-#edited data here https://github.com/QuantLet/Meta_learner-for-Causal-ML/blob/main/Microcredit-Example/data_rep.dta
-
-#to get stata subheadings a searchable dataframe
+# Load dataset (pre-processed version of AEA microcredit study)
 loan_data_raw <- read_dta('data_rep.dta')
 
+# Create a lookup table of variable labels (helpful for interpretation later)
 loan_names <- head(loan_data_raw) %>%  
- map_dfc(attr, "label") %>% 
-  bind_rows(mutate_all(small_microdata, as.character)) %>%  head(1) %>% 
+  map_dfc(attr, "label") %>% 
+  bind_rows(mutate_all(small_microdata, as.character)) %>%  
+  head(1) %>% 
   t() %>% 
   as.data.frame()
 
 loan_names <- tibble::rownames_to_column(loan_names, "VALUE")
 
-#load data
+
+# -----------------------------
+# Feature engineering
+# -----------------------------
+
 loan_data <- read_dta('data_rep.dta') %>% 
-  mutate(profit_change=profit_total-profit_total_bl, #we want to assess change in profits from self employed work
+  mutate(
+    # Key outcomes: change from baseline (this is what we care about causally)
+    profit_change = profit_total - profit_total_bl,
+    assets_change = assets_total - assets_total_bl
   ) %>% 
-  select(treatment, profit_change, assets_change,assets_total,assets_total_bl, profit_total_bl, profit_total, loansamt_total, 
-  members_resid_bl, nadults_resid_bl, head_age_bl, act_livestock_bl, act_business_bl, borrowed_total_bl, members_resid_d_bl, 
-  nadults_resid_d_bl, head_age_d_bl, act_livestock_d_bl, act_business_d_bl, borrowed_total_d_bl, ccm_resp_activ, other_resp_activ, 
-  ccm_resp_activ_d, other_resp_activ_d, head_educ_1, nmember_age6_16) %>%  #restricting to just ~20 covariates
-  filter (!is.na(nmember_age6_16)) #get rid of NAs
+  
+  # Restrict to a focused set of pre-treatment covariates
+  select(
+    treatment, profit_change, assets_change,
+    assets_total, assets_total_bl, profit_total_bl, profit_total,
+    loansamt_total,
+    members_resid_bl, nadults_resid_bl, head_age_bl,
+    act_livestock_bl, act_business_bl, borrowed_total_bl,
+    members_resid_d_bl, nadults_resid_d_bl, head_age_d_bl,
+    act_livestock_d_bl, act_business_d_bl, borrowed_total_d_bl,
+    ccm_resp_activ, other_resp_activ,
+    ccm_resp_activ_d, other_resp_activ_d,
+    head_educ_1, nmember_age6_16
+  ) %>% 
+  
+  # Drop rows with missing key features (simple but reasonable choice here)
+  filter(!is.na(nmember_age6_16))
 
-#see if profit change happen in treatment
-profit_lm <- lm(profit_change ~ treatment, data=loan_data)
+
+# -----------------------------
+# Step 1: Estimate average treatment effect (ATE)
+# -----------------------------
+
+# Simple regression since treatment is randomized
+profit_lm <- lm(profit_change ~ treatment, data = loan_data)
 summary(profit_lm)$coef
-#stat sig, estimated lift of $3100
 
-#profit change by treatment
-loan_data %>% group_by(treatment) %>% 
-  summarise(avg_profit_change= mean(profit_change))
-#non treatment $3824, treatment $6924
+# Sanity check: group averages
+loan_data %>% 
+  group_by(treatment) %>% 
+  summarise(avg_profit_change = mean(profit_change))
 
-#separate into test and train
-Loan_cases <- sample(seq_len(nrow(loan_data)), round(nrow(loan_data) * .6))
+
+# -----------------------------
+# Step 2: Train/test split
+# -----------------------------
+
+set.seed(1839)
+
+Loan_cases <- sample(seq_len(nrow(loan_data)), round(nrow(loan_data) * 0.6))
+
 loan_train <- loan_data[Loan_cases, ]
-loan_test <- loan_data[-Loan_cases, ]
+loan_test  <- loan_data[-Loan_cases, ]
 
-#turn data into vectors for causal forest
+
+# -----------------------------
+# Step 3: Prepare inputs for causal forest
+# -----------------------------
+
+# Outcome: change in profit
 Y <- as.vector(loan_train$profit_change)
+
+# Treatment indicator (must be 0/1)
 W <- as.vector(loan_train$treatment)
 
-#run causal forest, ignore data at start of data frame that has post-baseline data
-cf_loan <- 
-  causal_forest(
-    X = model.matrix(~ ., data = loan_train[, 9:ncol(loan_train)]),
-    Y = Y,
-    W = W,
-    num.trees = 5000,
-    seed = 1839
-  )
+# Features: only pre-treatment covariates
+# model.matrix expands categorical variables into dummies
+X_train <- model.matrix(~ . - 1, data = loan_train[, 9:ncol(loan_train)])
 
-#predict values in test data
+
+# -----------------------------
+# Step 4: Train causal forest
+# -----------------------------
+
+cf_loan <- causal_forest(
+  X = X_train,
+  Y = Y,
+  W = W,
+  num.trees = 5000,
+  seed = 1839
+)
+
+
+# -----------------------------
+# Step 5: Predict individual treatment effects (CATE)
+# -----------------------------
+
+X_test <- model.matrix(~ . - 1, data = loan_test[, 9:ncol(loan_test)])
+
 preds_loan <- predict(
-  object = cf_loan, 
-  newdata = model.matrix(~ ., data = loan_test[, 9:ncol(loan_test)]), 
+  object = cf_loan,
+  newdata = X_test,
   estimate.variance = TRUE
 )
 
-#connect predictions to test data
-loan_test$preds <- preds_loan$predictions 
+# Attach predicted treatment effects back to dataset
+loan_test$preds <- preds_loan$predictions
 
-#find which features are most important
+
+# -----------------------------
+# Step 6: Variable importance
+# -----------------------------
+
 cf_loan %>% 
   variable_importance() %>% 
   as.data.frame() %>% 
   mutate(variable = colnames(cf_loan$X.orig)) %>% 
   arrange(desc(V1))
-#number of houhsehold members is most important, followed by age of head of household, followed by number of people ages 6-16
 
-#make visual plot to see how predictions relate to most important variables of causal forest model
+
+# -----------------------------
+# Step 7: Visualize how treatment effects vary
+# -----------------------------
+
+# Each plot shows how estimated treatment effect changes with a key variable
+
 p1 <- ggplot(loan_test, aes(x = members_resid_bl, y = preds)) +
-  geom_point() +
+  geom_point(alpha = 0.3) +
   geom_smooth(method = "loess", span = 1) +
   theme_light()
 
 p2 <- ggplot(loan_test, aes(x = head_age_bl, y = preds)) +
-  geom_point() +
+  geom_point(alpha = 0.3) +
   geom_smooth(method = "loess", span = 1) +
   theme_light()
 
 p3 <- ggplot(loan_test, aes(x = nmember_age6_16, y = preds)) +
-  geom_point() +
+  geom_point(alpha = 0.3) +
   geom_smooth(method = "loess", span = 1) +
   theme_light()
 
 p4 <- ggplot(loan_test, aes(x = nadults_resid_bl, y = preds)) +
-  geom_point() +
+  geom_point(alpha = 0.3) +
   geom_smooth(method = "loess", span = 1) +
   theme_light()
 
 cowplot::plot_grid(p1, p2, p3, p4)
-#takeaway: ideal number in household for positive change in profit is 4, becomes negative at 5, ideal age of head of household is 40, goes negative at ~62, 
-#ideal number of kids in house is 3 or less, negative at 4
-#if we were to create a tool out of this, we might follow these rules or prioritize these people for this particular program if we have limited resources. 
-#Or we could use this finding to find out why the program had negative impacts for certain groups of people and adjust the program
 
 
-#see if profit change happened in treatment using the predicted values
-profit_lm <- lm(preds ~ treatment, data=loan_test )
-summary(profit_lm)$coef
-#stat sig, estimated lift of $600
+# -----------------------------
+# Step 8: Rank households by predicted benefit
+# -----------------------------
 
-#profit change by treatment, using predicted values
-loan_test%>% 
-  group_by(treatment) %>% 
-  summarise(avg_profit_change= mean(preds))
-#$2.9k profit change for control vs 3.5k for treatment, diff of $600
+loan_test %>%
+  mutate(bin = ntile(preds, 5)) %>% 
+  group_by(bin) %>% 
+  summarise(avg_effect = mean(preds))
 
-#profit change by treatment using predicted values at the cutoff value for number of people in the household where treatment effect becomes netural
-loan_test%>% 
-  filter(members_resid_bl>5) %>% 
-           group_by(treatment) %>% 
-  summarise(avg_profit_change= mean(preds))
-#$4.6 profit change for both treatment and control at more than 5 HH members, ideal cutoff if looking to optimize results of loan
+# Compare overall vs targeted strategy
+loan_test %>%
+  summarise(overall = mean(preds))
+
+loan_test %>%
+  filter(preds > 0) %>%
+  summarise(targeted = mean(preds))
 
 
-############ decision tree to show how to cut using the top factors. A random forest uses many decision trees but does not have a simple output. A decision tree can be made
-#using the top variables from the causal forest. It won't be a precise replica of the decision criteria used by a random forest but it can be illustrative of some of the 
-#rules for determing ideal eligibility for the program.
+# -----------------------------
+# Step 9: Build interpretable segmentation (decision tree)
+# -----------------------------
 
-loan_data_less <- loan_data %>%  filter(treatment==1) %>%  select(profit_change, members_resid_bl, head_age_bl, nmember_age6_16) %>% 
-  mutate(profit_change_cat= as.factor( cut_number(profit_change,5,labels = F))) %>% 
-select(-profit_change)
+loan_data_less <- loan_data %>%  
+  filter(treatment == 1) %>%  
+  select(profit_change, members_resid_bl, head_age_bl, nmember_age6_16) %>% 
+  
+  # Convert continuous outcome into bins to make tree easier to interpret
+  mutate(profit_change_cat = as.factor(cut_number(profit_change, 5, labels = FALSE))) %>% 
+  
+  select(-profit_change)
 
-Loan_less_cases <- sample(seq_len(nrow(loan_data_less)), round(nrow(loan_data_less) * .6))
+Loan_less_cases <- sample(seq_len(nrow(loan_data_less)), round(nrow(loan_data_less) * 0.6))
+
 loan_less_train <- loan_data_less[Loan_less_cases, ]
-loan_less_test <- loan_data_less[-Loan_less_cases, ]
+loan_less_test  <- loan_data_less[-Loan_less_cases, ]
 
-tree <- rpart(profit_change_cat ~., data = loan_less_train,
-              control=rpart.control(cp=.003),
-              minsplit=5,
-              minbucket=5,
-              maxdepth=5)
 
-rpart.plot(tree,cex=.75)
+tree <- rpart(
+  profit_change_cat ~ .,
+  data = loan_less_train,
+  method = 'class',
+  control = rpart.control(cp = 0.004),
+  minsplit = 20,
+  minbucket = 20,
+  maxdepth = 4
+)
+
+# Visual representation of segmentation rules
+rpart.plot(tree, cex = 0.7)
