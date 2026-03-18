@@ -1,118 +1,103 @@
-Causal Forest for Estimating Heterogeneous Treatment Effects
-
-TLDR
-
-This project applies a causal forest model to estimate how the effect of a treatment varies across individuals rather than assuming a single average effect. Instead of only asking “does the treatment work?”, the model identifies who it works best for, which is often the more useful question in product, marketing, and policy decisions.
-
+Estimating the Impact of Microcredit Using Causal Forests
 Overview
 
-Many analytics questions are fundamentally causal. For example:
+This project analyzes the impact of microcredit access on small business profits using data from a randomized controlled trial (RCT).
 
-Does a new feature actually increase user engagement?
+While traditional analysis shows that loans increase profits on average, this project focuses on a deeper question:
 
-Does a marketing campaign improve conversion?
+Who benefits from microcredit—and who does not?
 
-Does a pricing change increase revenue?
+To answer this, I use a causal forest to estimate heterogeneous treatment effects at the individual level.
 
-Traditional machine learning models are designed to predict outcomes, but they do not distinguish between correlation and causation.
+📊 Key Results
+Average Effect (ATE)
 
-This project uses a causal forest, a machine learning method designed to estimate treatment effects directly. The model is an extension of random forests that focuses on identifying how the impact of a treatment varies across different subgroups in the data.
+Access to loans increases profits by approximately $3,100 on average (statistically significant)
 
-Rather than predicting an outcome like “conversion probability,” the model estimates the conditional treatment effect for each observation.
+This confirms prior findings that microcredit has a positive mean effect
 
-In practical terms, it answers questions like:
+Heterogeneous Effects (CATE)
 
-Which users benefit most from a product feature?
+However, the average effect masks substantial variation:
 
-Which customers respond best to a promotion?
+Top 20% of households: +$8,311 increase in profits
 
-Where might a policy intervention have the strongest impact?
+Bottom 20% of households: –$7,179 decrease in profits
 
-Why causal forests are useful
+This represents a $15K spread in outcomes across households
 
-In many real-world systems, the effect of an intervention is not uniform across the population.
+This suggests that microcredit is not universally beneficial—and may harm some households.
 
-A marketing discount might increase purchases for price-sensitive customers but have little effect on loyal customers who would buy anyway.
+Targeting Improves Outcomes
 
-A causal forest helps uncover these differences by learning where treatment effects vary across the feature space. Instead of minimizing prediction error like a standard random forest, it splits the data to maximize differences in estimated treatment effects between groups.
+Average predicted effect across all households: –$76 (roughly neutral out-of-sample)
 
-This allows the model to estimate heterogeneous treatment effects, which can be used for targeted decisions.
+Average predicted effect among positive responders only: +$4,650
 
-Dataset and structure
+Targeting loans to likely beneficiaries could significantly improve program effectiveness.
 
-The dataset includes:
+🔍 What Drives These Differences?
 
-covariates describing each observation
+The most important drivers of treatment effect heterogeneity are:
 
-a treatment indicator (whether the individual received the intervention)
+Age of household head
 
-an outcome variable
+Household size
 
-The analysis follows a typical causal inference structure:
+Number of adults
 
-Define treatment and outcome variables
+Number of children (ages 6–16)
 
-Use covariates to control for confounding
+Key patterns:
 
-Train a causal forest model to estimate conditional treatment effects
+Household size: Effects peak around ~4 members and decline beyond 5
 
-The model produces an estimated treatment effect for each observation, which can then be analyzed to understand how the intervention behaves across different groups.
+Head age: Effects peak around ~40 and decline after ~60
 
-Modeling approach
+Children: Households with ≥4 children show negative effects
 
-The analysis uses the generalized random forest implementation of causal forests.
+🧠 Interpretation
 
-Conceptually, the algorithm works as follows:
+These variables all relate to labor capacity vs. dependency burden:
 
-Many causal trees are built on random subsets of the data
+Households with sufficient working-age members can convert loans into productive income
 
-Each tree partitions the data into groups with different estimated treatment effects
+Households with high dependency burdens may divert capital toward consumption
 
-The forest aggregates results across trees to estimate individual-level treatment effects
+Microcredit appears most effective for mid-sized, working-age households with balanced dependency ratios
 
-This ensemble approach helps stabilize estimates and detect patterns that would be difficult to identify with traditional regression models.
+🌳 Policy Segmentation (Decision Tree)
 
-Causal forests are particularly useful when:
+A decision tree trained on treated households reveals simple targeting rules:
 
-treatment effects vary across individuals
+Moderate household size (<5 members) performs best
 
-the dataset has many potential confounders
+Lower dependency burden (fewer children) improves outcomes
 
-relationships are nonlinear or complex
+Middle-aged household heads outperform older ones
 
-Interpreting the results
+These rules provide a practical framework for targeting lending programs.
 
-Instead of producing a single coefficient like a linear model, the causal forest estimates how the treatment effect varies across observations.
+⚠️ Key Takeaway
 
-Typical outputs include:
+A uniform lending strategy masks large inefficiencies.
 
-estimated treatment effect distribution
+Some households benefit substantially
 
-variable importance for treatment effect heterogeneity
+Others may be harmed
 
-subgroup-level treatment effects
+Targeted lending could increase returns while reducing risk to vulnerable populations.
 
-These outputs can be used to guide practical decisions such as targeting interventions only where they produce meaningful impact.
+🛠 Methods
 
-Example applications
+Linear regression (ATE estimation)
 
-Methods like this are increasingly used in real-world systems, including:
+Causal Forest (heterogeneous treatment effects)
 
-marketing uplift modeling
+LOESS smoothing (response visualization)
 
-recommendation systems
+Decision tree (interpretable segmentation)
 
-pricing optimization
+📁 Data Source
 
-healthcare treatment personalization
-
-policy evaluation
-
-The ability to estimate who benefits from an intervention can dramatically improve decision-making compared with relying on average effects alone.
-
-Tools used
-
-R
-grf (generalized random forest)
-tidyverse
-ggplot2
+AEA Microcredit Study
