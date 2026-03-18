@@ -1,108 +1,123 @@
-# 💸 Estimating the Impact of Microcredit Using Causal Forests
+# 💸 Microcredit: Who Actually Benefits?
 
-## Overview
+## TLDR
 
-This project analyzes the impact of microcredit access on small business profits using data from a randomized controlled trial (RCT).
+- Used a **causal forest** to estimate heterogeneous treatment effects from an RCT  
+- Average impact: **+$3,100** increase in profits  
+- But effects vary dramatically:  
+  - Top 20%: **+$8,300**  
+  - Bottom 20%: **–$7,200**  
+- Targeting only likely beneficiaries increases impact to **+$4,650**  
+- Key drivers: household size, age, and dependency burden  
 
-While traditional analysis shows that loans increase profits on average, this project focuses on a deeper question:
-
-> **Who benefits from microcredit—and who does not?**
-
-To answer this, I use a **causal forest** to estimate heterogeneous treatment effects at the individual level.
-
----
-
-## 📊 Key Results
-
-### Average Effect (ATE)
-
-- Access to loans increases profits by approximately **$3,100 on average** *(statistically significant)*  
-- This confirms prior findings that microcredit has a positive mean effect  
+> Microcredit works on average—but not for everyone. Targeting matters.
 
 ---
 
-### Heterogeneous Effects (CATE)
+## What this project does
 
-However, the average effect masks substantial variation:
+This is a causal ML analysis of a well-known microcredit RCT.
 
-- **Top 20% of households:** +$8,311 increase in profits  
-- **Bottom 20% of households:** –$7,179 decrease in profits  
+Instead of stopping at the average treatment effect, I use a **causal forest (grf)** to estimate how the effect of receiving a loan varies across households.
 
-> This represents a **$15K spread** in outcomes across households
+The goal is simple:
 
-This suggests that microcredit is not universally beneficial—and may harm some households.
-
----
-
-### Targeting Improves Outcomes
-
-- Average predicted effect across all households: **–$76** *(roughly neutral out-of-sample)*  
-- Average predicted effect among **positive responders only:** **+$4,650**
-
-> Targeting loans to likely beneficiaries could significantly improve program effectiveness.
+> Understand **who benefits**, **who doesn’t**, and whether we can do better than a one-size-fits-all policy.
 
 ---
 
-## 🔍 What Drives These Differences?
+## Results
 
-The most important drivers of treatment effect heterogeneity are:
+### Average effect (ATE)
 
-- **Age of household head**  
-- **Household size**  
-- **Number of adults**  
-- **Number of children (ages 6–16)**  
+A baseline regression shows that access to loans increases profits by about:
 
-### Key patterns:
+**+$3,100 (statistically significant)**
 
-- **Household size:** Effects peak around ~4 members and decline beyond 5  
-- **Head age:** Effects peak around ~40 and decline after ~60  
-- **Children:** Households with ≥4 children show negative effects  
+This matches the headline result you’d get from a standard analysis.
 
 ---
 
-## 🧠 Interpretation
+### Heterogeneous effects (CATE)
 
-These variables reflect **labor capacity vs. dependency burden**:
+The causal forest tells a very different story:
 
-- Households with sufficient working-age members can convert loans into productive income  
-- Households with high dependency burdens may divert capital toward consumption  
+- **Top 20% of households:** +$8,311  
+- **Bottom 20% of households:** –$7,179  
 
-> Microcredit appears most effective for **mid-sized, working-age households with balanced dependency ratios**
+That’s a **$15K spread** in outcomes.
+
+Some households benefit a lot. Others appear to be worse off.
 
 ---
 
-## 🌳 Policy Segmentation (Decision Tree)
+### Targeting vs. uniform policy
 
-A decision tree trained on treated households reveals simple targeting rules:
+Across all households:
 
-- Moderate household size (<5 members) performs best  
-- Lower dependency burden (fewer children) improves outcomes  
+- Average predicted effect: **–$76**
+
+Among households with positive predicted effects:
+
+- Average effect: **+$4,650**
+
+> This suggests that targeting loans—even with a simple model—could substantially improve outcomes.
+
+---
+
+## What drives the differences?
+
+The most important variables are:
+
+- Household size  
+- Age of the household head  
+- Number of adults  
+- Number of children (ages 6–16)  
+
+A few patterns stand out:
+
+- **Households around 4 members perform best**; outcomes drop after ~5  
+- **Heads around age 40 perform best**; effects decline after ~60  
+- **More children → worse outcomes**, especially beyond 3–4  
+
+---
+
+## Interpretation
+
+These variables all relate to a common theme:
+
+**Ability to turn capital into productive income vs. pressure to consume it**
+
+- Mid-sized, working-age households → better able to invest loans  
+- Larger or high-dependency households → more likely to divert funds  
+
+> The results suggest microcredit is most effective for households with **balanced labor capacity and lower dependency burden**
+
+---
+
+## Making this actionable
+
+To make the results more interpretable, I trained a simple decision tree on treated households.
+
+It produces rules like:
+
+- Smaller to mid-sized households perform better  
+- Fewer dependents improves outcomes  
 - Middle-aged household heads outperform older ones  
 
-> These rules provide a practical framework for targeting lending programs.
+This provides a rough—but usable—framework for targeting.
 
 ---
 
-## ⚠️ Key Takeaway
+## Methods
 
-> A uniform lending strategy masks large inefficiencies.
-
-- Some households benefit substantially  
-- Others may be harmed  
-
-**Targeted lending could increase returns while reducing risk to vulnerable populations.**
+- Linear regression for ATE  
+- **Causal forest (grf)** for heterogeneous treatment effects  
+- LOESS smoothing to visualize non-linear relationships  
+- Decision tree for interpretable segmentation  
 
 ---
 
-## 🛠 Methods
+## Data
 
-- Linear regression (ATE estimation)  
-- Causal Forest (heterogeneous treatment effects)  
-- LOESS smoothing (response visualization)  
-- Decision tree (interpretable segmentation)  
-
----
-
-## 📁 Data Source
-
-- [AEA Microcredit Study](https://www.aeaweb.org/articles?id=10.1257/app.20130535)
+- AEA Microcredit Study: https://www.aeaweb.org/articles?id=10.1257/app.20130535
